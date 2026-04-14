@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Análisis Canasta Básica | San Sebastián</title>
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
+    <!-- Papa Parse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #f4f7fc;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem 1.5rem;
+            color: #1e2a3e;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: #1e3c72;
+        }
+        .subtitle {
+            color: #3a5f7a;
+            font-size: 1rem;
+        }
+        .card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            padding: 1.8rem;
+            margin-bottom: 2rem;
+            border: 1px solid #dee7ef;
+        }
+        .upload-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .file-label {
+            background: #2c5f8a;
+            color: white;
+            padding: 0.7rem 1.5rem;
+            border-radius: 60px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-block;
+        }
+        .file-label:hover { background: #1f4a6e; }
+        input[type="file"] { display: none; }
+        .example-btn, .raw-data-btn {
+            background: #e3eaf1;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 60px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #1e4663;
+            transition: all 0.2s;
+        }
+        .example-btn:hover, .raw-data-btn:hover {
+            background: #cddae6;
+            transform: scale(0.97);
+        }
+        .raw-data-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .alert {
+            background: #fff1e0;
+            border-left: 5px solid #e67e22;
+            padding: 0.8rem 1.2rem;
+            border-radius: 16px;
+            margin: 1rem 0 0 0;
+            display: none;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .stat-card {
+            background: #f8fafd;
+            border-radius: 20px;
+            padding: 1.2rem 0.5rem;
+            text-align: center;
+            border-left: 5px solid #2c5f8a;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #5b7a9a;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e3c72;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border-radius: 18px;
+            background: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            min-width: 900px;
+        }
+        th {
+            background: #1e3c72;
+            color: white;
+            font-weight: 600;
+            padding: 0.9rem 0.8rem;
+            text-align: center;
+        }
+        td {
+            padding: 0.7rem 0.8rem;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: right;
+        }
+        td:first-child {
+            text-align: left;
+            font-weight: 500;
+            background-color: #f9fbfd;
+        }
+        tr:last-child td { border-bottom: none; }
+        .total-row {
+            background: #eef3fc;
+            font-weight: 700;
+        }
+        .clickable-row {
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .clickable-row:hover {
+            background: #e6f0fa !important;
+        }
+        .selected-row {
+            background: #d4e3f5 !important;
+            font-weight: 600;
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 1.5rem 0 0.5rem;
+        }
+        .btn-back {
+            background: #6c8fb0;
+            color: white;
+            border: none;
+            padding: 0.4rem 1.2rem;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .button-save {
+            background: #1e4663;
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        .footer-note { text-align: center; font-size: 0.8rem; color: #5f7f9e; margin-top: 2rem; }
+
+        /* MODAL ESTILOS */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0.2s, opacity 0.2s;
+        }
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-container {
+            background: white;
+            border-radius: 32px;
+            width: 90%;
+            max-width: 1300px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.2);
+            animation: modalAppear 0.2s ease-out;
+        }
+        @keyframes modalAppear {
+            from { transform: scale(0.96); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.2rem 2rem;
+            border-bottom: 1px solid #e2edf7;
+            background: #f9fcff;
+            border-radius: 32px 32px 0 0;
+        }
+        .modal-header h3 {
+            font-weight: 600;
+            color: #1e3c72;
+            font-size: 1.4rem;
+        }
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #5f7f9e;
+            transition: 0.1s;
+            line-height: 1;
+        }
+        .close-modal:hover {
+            color: #c7254e;
+        }
+        .modal-body {
+            overflow: auto;
+            padding: 1rem 1.5rem 1.5rem 1.5rem;
+            flex: 1;
+        }
+        .raw-table-wrapper {
+            overflow-x: auto;
+            border-radius: 20px;
+            border: 1px solid #dee7ef;
+        }
+        .raw-table {
+            min-width: 800px;
+            font-size: 0.85rem;
+        }
+        .raw-table th, .raw-table td {
+            padding: 0.6rem 0.8rem;
+            text-align: center;
+        }
+        .raw-table td:first-child {
+            background: none;
+            font-weight: normal;
+        }
+        .no-data-msg {
+            text-align: center;
+            padding: 3rem;
+            color: #6c8fb0;
+        }
+        .button-group {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🛒 Análisis de la Canasta Básica Familiar</h1>
+    </div>
+
+    <!-- Carga de datos -->
+    <div class="card">
+        <div class="upload-area">
+            <div>
+                <label for="csvFileInput" class="file-label">📂 Cargar archivo CSV</label>
+                <input type="file" id="csvFileInput" accept=".csv, text/csv">
+                <span id="fileNameDisplay" style="margin-left:1rem; font-size:0.9rem;"></span>
+            </div>
+            <div class="button-group">
+                <button id="loadExampleBtn" class="example-btn">📋 Usar datos de ejemplo</button>
+                <button id="viewRawDataBtn" class="raw-data-btn" disabled style="display: none;">📋 Ver datos crudos</button>
+            </div>
+        </div>
+        <div id="errorMessage" class="alert"></div>
+    </div>
+
+    <!-- Panel de estadísticas -->
+    <div id="statsPanel" class="card">
+        <h2>📈 Estadísticos descriptivos <span id="dataCountDisplay" style="font-size:0.9rem; margin-left:1rem;">0 datos</span></h2>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">📐 Media global</div><div class="stat-value" id="globalMean">—</div></div>
+            <div class="stat-card"><div class="stat-label">📊 Varianza global</div><div class="stat-value" id="globalVar">—</div></div>
+            <div class="stat-card"><div class="stat-label">📏 Desviación global</div><div class="stat-value" id="globalStd">—</div></div>
+            <div class="stat-card"><div class="stat-label">💰 Costo Total</div><div class="stat-value" id="totalCost">S/0.00</div></div>
+        </div>
+
+        <!-- Tabla de resultados -->
+        <div class="table-wrapper">
+            <table id="statsTable">
+                <thead>
+                    <tr><th>Producto</th><th>Media</th><th>Varianza (S²)</th><th>Desv. Est.</th><th>CV (%)</th></tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Controles de gráfico -->
+        <div class="chart-header">
+            <h3 id="chartTitle">📦 Distribución de precios (todos los productos)</h3>
+            <button id="backToCombinedBtn" class="btn-back" style="display:none;">↩ Ver todos los productos</button>
+        </div>
+        <div id="chartContainer" style="height:480px;"></div>
+        <div style="display:flex; justify-content:flex-end;">
+            <button id="saveReportBtn" class="button-save">📸 Guardar informe</button>
+        </div>
+    </div>
+    <div class="footer-note">✅ Haga clic en cualquier producto de la tabla para ver su gráfico individual.</div>
+</div>
+
+<!-- MODAL PARA DATOS CRUDOS -->
+<div id="rawDataModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>📄 Datos originales (crudos)</h3>
+            <button class="close-modal" id="closeModalBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="rawDataTableContainer" class="raw-table-wrapper">
+                <!-- Aquí se llenará la tabla dinámica -->
+                <div class="no-data-msg">Cargue un archivo CSV o datos de ejemplo para visualizar.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // Estado
+        let currentStats = [];               // array de {product, mean, variance, stdDev, cv, data}
+        let productColumns = [];
+        let currentChartMode = 'combined';    // 'combined' o 'single'
+        let selectedProduct = null;
+        let rawDataRows = [];                 // almacena las filas originales del CSV (array de objetos)
+        
+        // Elementos DOM
+        const csvFileInput = document.getElementById('csvFileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const loadExampleBtn = document.getElementById('loadExampleBtn');
+        const errorDiv = document.getElementById('errorMessage');
+        const dataCountDisplay = document.getElementById('dataCountDisplay');
+        const globalMeanSpan = document.getElementById('globalMean');
+        const globalVarSpan = document.getElementById('globalVar');
+        const globalStdSpan = document.getElementById('globalStd');
+        const totalCostSpan = document.getElementById('totalCost');
+        const tableBody = document.getElementById('tableBody');
+        const saveReportBtn = document.getElementById('saveReportBtn');
+        const chartTitle = document.getElementById('chartTitle');
+        const backToCombinedBtn = document.getElementById('backToCombinedBtn');
+        const chartContainer = document.getElementById('chartContainer');
+        const viewRawDataBtn = document.getElementById('viewRawDataBtn');
+        const modalOverlay = document.getElementById('rawDataModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const rawDataContainer = document.getElementById('rawDataTableContainer');
+
+        function showError(msg) {
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = msg;
+            setTimeout(() => errorDiv.style.display = 'none', 4000);
+        }
+        function showMessage(msg, ok=true) {
+            errorDiv.style.display = 'block';
+            errorDiv.style.background = ok ? '#e0f2e9' : '#fff1e0';
+            errorDiv.style.borderLeftColor = ok ? '#2e7d64' : '#e67e22';
+            errorDiv.textContent = msg;
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+                errorDiv.style.background = '#fff1e0';
+                errorDiv.style.borderLeftColor = '#e67e22';
+            }, 3000);
+        }
+
+        function computeStats(arr) {
+            const n = arr.length;
+            if (n===0) return { mean:NaN, variance:NaN, stdDev:NaN, cv:NaN };
+            const sum = arr.reduce((a,b)=>a+b,0);
+            const mean = sum/n;
+            if (n===1) return { mean, variance:0, stdDev:0, cv:0 };
+            const sumSq = arr.reduce((acc,v)=>(acc + (v-mean)**2),0);
+            const variance = sumSq/(n-1);
+            const stdDev = Math.sqrt(variance);
+            const cv = mean!==0 ? (stdDev/mean)*100 : NaN;
+            return { mean, variance, stdDev, cv };
+        }
+
+        // Actualiza el botón de datos crudos según si hay datos
+        function updateRawDataButtonState() {
+            if (rawDataRows && rawDataRows.length > 0) {
+                viewRawDataBtn.disabled = false;
+                viewRawDataBtn.title = "Ver tabla de datos originales";
+            } else {
+                viewRawDataBtn.disabled = true;
+                viewRawDataBtn.title = "No hay datos cargados";
+            }
+        }
+
+        // Llena el modal con la tabla de datos crudos
+        function renderRawDataModal() {
+            if (!rawDataRows || rawDataRows.length === 0) {
+                rawDataContainer.innerHTML = `<div class="no-data-msg">📭 No hay datos cargados. Cargue un archivo CSV o use el ejemplo.</div>`;
+                return;
+            }
+            
+            // Obtener todas las columnas del primer objeto (orden original)
+            const allKeys = Object.keys(rawDataRows[0]);
+            if (allKeys.length === 0) {
+                rawDataContainer.innerHTML = `<div class="no-data-msg">⚠️ Estructura de datos vacía.</div>`;
+                return;
+            }
+            
+            // Construir tabla HTML
+            let html = `<table class="raw-table" style="min-width:100%; border-collapse: collapse;">`;
+            html += `<thead><tr>`;
+            allKeys.forEach(key => {
+                html += `<th style="background:#2c5f8a; color:white; padding:0.7rem;">${escapeHtml(key)}</th>`;
+            });
+            html += `</tr></thead><tbody>`;
+            
+            for (let row of rawDataRows) {
+                html += `<tr>`;
+                for (let key of allKeys) {
+                    let val = row[key];
+                    // Si es número, formatear a 4 decimales si es float, pero mantener string
+                    let displayVal = val;
+                    if (typeof val === 'number' && !isNaN(val)) {
+                        displayVal = val.toFixed(4);
+                    } else if (val === undefined || val === null) {
+                        displayVal = '';
+                    } else {
+                        displayVal = String(val);
+                    }
+                    html += `<td style="padding:0.5rem 0.7rem; border-bottom:1px solid #e2e8f0; text-align:center;">${escapeHtml(displayVal)}</td>`;
+                }
+                html += `</tr>`;
+            }
+            html += `</tbody></table>`;
+            rawDataContainer.innerHTML = html;
+        }
+        
+        // simple escape para prevenir XSS
+        function escapeHtml(str) {
+            if (str === undefined || str === null) return '';
+            return String(str).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            });
+        }
+
+        function processData(rows) {
+            if (!rows.length) { showError('Archivo vacío'); return false; }
+            const headers = Object.keys(rows[0]);
+            productColumns = headers.filter(h => {
+                const low = h.toLowerCase().trim();
+                return low !== 'muestra' && low !== 'conglomerado' && low !== '';
+            });
+            if (!productColumns.length) { showError('No hay columnas de productos'); return false; }
+            
+            const productData = {};
+            productColumns.forEach(c => productData[c]=[]);
+            let validRows=0;
+            rows.forEach(row => {
+                let ok = true;
+                const vals = {};
+                for (let c of productColumns) {
+                    const v = parseFloat(row[c]);
+                    if (isNaN(v)) { ok=false; break; }
+                    vals[c] = v;
+                }
+                if (ok) {
+                    validRows++;
+                    for (let c of productColumns) productData[c].push(vals[c]);
+                }
+            });
+            if (!validRows) { showError('No hay datos numéricos válidos'); return false; }
+
+            const statsResults = [];
+            let totalMean = 0;
+            productColumns.forEach(col => {
+                const arr = productData[col];
+                const st = computeStats(arr);
+                statsResults.push({ product: col, ...st, data: arr });
+                if (!isNaN(st.mean)) totalMean += st.mean;
+            });
+            currentStats = statsResults;
+            
+            // Guardar los datos crudos (originales) para visualización
+            rawDataRows = rows.slice();  // copia superficial pero suficiente
+            updateRawDataButtonState();
+            
+            updateUITableAndGlobal(statsResults, totalMean, validRows);
+            currentChartMode = 'combined';
+            selectedProduct = null;
+            backToCombinedBtn.style.display = 'none';
+            chartTitle.textContent = '📦 Distribución de precios (todos los productos)';
+            drawCombinedBoxplot(statsResults);
+            dataCountDisplay.textContent = `${validRows} filas · ${productColumns.length} productos`;
+            return true;
+        }
+
+        function updateUITableAndGlobal(stats, totalCost, n) {
+            let html = '';
+            stats.forEach((item, idx) => {
+                const cvStr = isNaN(item.cv) ? '—' : item.cv.toFixed(2)+'%';
+                html += `<tr class="clickable-row" data-index="${idx}" data-product="${item.product}">
+                    <td>${item.product}</td>
+                    <td>${item.mean.toFixed(4)}</td>
+                    <td>${item.variance.toFixed(4)}</td>
+                    <td>${item.stdDev.toFixed(4)}</td>
+                    <td>${cvStr}</td>
+                </table>`;
+            });
+            html += `<tr class="total-row"><td><strong>COSTO TOTAL</strong></td><td colspan="1"><strong>${totalCost.toFixed(4)}</strong></td><td colspan="3"></td></tr>`;
+            tableBody.innerHTML = html;
+            totalCostSpan.textContent = `S/ ${totalCost.toFixed(2)}`;
+            
+            let allVals = [];
+            stats.forEach(p => allVals = allVals.concat(p.data));
+            const glob = computeStats(allVals);
+            globalMeanSpan.textContent = glob.mean.toFixed(4);
+            globalVarSpan.textContent = glob.variance.toFixed(4);
+            globalStdSpan.textContent = glob.stdDev.toFixed(4);
+            
+            // Agregar listeners a filas clickeables
+            document.querySelectorAll('.clickable-row').forEach(row => {
+                row.removeEventListener('click', row.clickHandler); // limpiar previo
+                const handler = (e) => {
+                    const idx = row.dataset.index;
+                    if (idx !== undefined) {
+                        const prodStats = currentStats[parseInt(idx)];
+                        selectSingleProduct(prodStats);
+                    }
+                };
+                row.clickHandler = handler;
+                row.addEventListener('click', handler);
+            });
+        }
+
+        function selectSingleProduct(prodStats) {
+            selectedProduct = prodStats;
+            currentChartMode = 'single';
+            backToCombinedBtn.style.display = 'inline-block';
+            chartTitle.textContent = `🔍 ${prodStats.product} (n=${prodStats.data.length})`;
+            // Remover selección visual previa
+            document.querySelectorAll('.clickable-row').forEach(r => r.classList.remove('selected-row'));
+            const row = Array.from(document.querySelectorAll('.clickable-row')).find(r => r.dataset.product === prodStats.product);
+            if (row) row.classList.add('selected-row');
+            drawSingleProductChart(prodStats);
+        }
+
+        function drawCombinedBoxplot(stats) {
+            const colors = [
+                '#3b6e9e', '#e76f51', '#2a9d8f', '#f4a261',
+                '#8ab17d', '#6d597a', '#f28482', '#84a59d',
+                '#f6bd60', '#90dbf4', '#cdb4db', '#ffafcc'
+            ];
+
+            const traces = stats.map((p, i) => ({
+                y: p.data,
+                name: p.product,
+                type: 'box',
+                boxmean: 'sd',
+                marker: { color: colors[i % colors.length] },
+                line: { width: 1.5 },
+                hovertemplate: '<b>%{x}</b><br>Valor: %{y:.4f}<extra></extra>'
+            }));
+            const layout = {
+                title: 'Distribución de precios por producto',
+                xaxis: { title: 'Producto', tickangle: -30 },
+                yaxis: { title: 'Precio (S/.)' },
+                hovermode: 'closest'
+            };
+            Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
+        }
+
+        function drawSingleProductChart(prod) {
+            const data = prod.data;
+            const mean = prod.mean, std = prod.stdDev;
+            const traceHist = {
+                x: data,
+                type: 'histogram',
+                name: 'Frecuencia',
+                marker: { color: '#5b8cbc', line: { color: '#2c5f8a', width: 1 }},
+                opacity: 0.7,
+                histnorm: '',
+                hovertemplate: 'Intervalo: %{x}<br>Frecuencia: %{y}<extra></extra>'
+            };
+            let curveX = [], curveY = [];
+            if (std > 0 && data.length > 1) {
+                const minX = Math.min(...data), maxX = Math.max(...data);
+                const lower = Math.min(minX, mean-4*std);
+                const upper = Math.max(maxX, mean+4*std);
+                const step = (upper-lower)/200;
+                const N = data.length;
+                const binWidth = (maxX - minX) / (Math.ceil(1+Math.log2(N)) || 8);
+                for (let x=lower; x<=upper; x+=step) {
+                    const dens = (1/(std*Math.sqrt(2*Math.PI))) * Math.exp(-0.5*Math.pow((x-mean)/std,2));
+                    curveX.push(x);
+                    curveY.push(dens * N * binWidth);
+                }
+            }
+            const traceCurve = {
+                x: curveX, y: curveY,
+                type: 'scatter', mode: 'lines',
+                name: 'Curva normal (escalada)',
+                line: { color: '#d95f4a', width: 2.5 }
+            };
+            const traces = [traceHist];
+            if (curveX.length) traces.push(traceCurve);
+            
+            const layout = {
+                title: `${prod.product} — Media=${mean.toFixed(4)}  Desv.=${std.toFixed(4)}  CV=${prod.cv.toFixed(2)}%`,
+                xaxis: { title: 'Precio (S/)' },
+                yaxis: { title: 'Frecuencia absoluta' },
+                bargap: 0.05,
+                showlegend: true,
+                legend: { orientation: 'h', y: 1.1 }
+            };
+            Plotly.newPlot(chartContainer, traces, layout, { responsive: true });
+        }
+
+        function resetToCombined() {
+            if (!currentStats.length) return;
+            currentChartMode = 'combined';
+            selectedProduct = null;
+            backToCombinedBtn.style.display = 'none';
+            chartTitle.textContent = '📦 Distribución de precios (todos los productos)';
+            document.querySelectorAll('.clickable-row').forEach(r => r.classList.remove('selected-row'));
+            drawCombinedBoxplot(currentStats);
+        }
+
+        // Parse CSV
+        function parseCSV(text) {
+            return new Promise((resolve, reject) => {
+                Papa.parse(text, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: r => resolve(r.data),
+                    error: e => reject(e)
+                });
+            });
+        }
+
+        async function loadCSV(file) {
+            try {
+                const text = await file.text();
+                const rows = await parseCSV(text);
+                if (processData(rows)) {
+                    fileNameDisplay.textContent = `📄 ${file.name} · ${rows.length} filas`;
+                    showMessage('Datos cargados correctamente', true);
+                }
+            } catch(e) { 
+                console.error(e);
+                showError('Error al leer CSV: formato inválido'); 
+            }
+        }
+
+        // Datos ejemplo
+        function loadExample() {
+            const csv = `Muestra,Conglomerado,Producto Alfa,Producto Beta,Producto Gamma,Producto Delta,Producto Epsilon,Producto Zeta,Producto Eta,Producto Theta,Producto Iota,Producto Kappa,Producto Lambda,Producto Mu,Producto Nu,Producto Xi
+1,Zona Norte,12.3,8.7,45.2,23.1,5.6,9.4,3.2,7.8,15.0,6.1,4.9,0.8,11.2,20.5
+2,Zona Norte,11.9,9.0,44.8,22.7,5.9,9.0,3.4,7.5,14.8,6.3,5.1,0.7,10.9,21.0
+3,Zona Norte,12.1,8.5,45.0,23.5,5.4,9.7,3.1,7.9,15.2,6.0,4.8,0.9,11.4,19.8
+4,Zona Norte,12.5,8.9,44.5,22.9,6.0,9.2,3.5,7.6,14.5,6.4,5.0,0.8,11.0,20.3
+5,Zona Norte,11.7,8.6,45.5,23.8,5.7,9.5,3.0,8.0,15.3,6.2,5.2,0.7,11.3,20.7
+6,Zona Centro,13.8,9.5,48.2,25.1,6.8,10.3,3.8,8.5,16.0,7.1,5.8,1.0,12.5,22.1
+7,Zona Centro,13.5,9.8,47.9,24.8,7.0,10.5,4.0,8.2,16.3,6.9,5.6,1.1,12.3,22.5
+8,Zona Centro,14.0,9.3,48.5,25.3,6.5,10.0,3.6,8.7,15.8,7.3,5.9,0.9,12.7,21.8
+9,Zona Centro,13.2,9.6,47.5,24.5,7.2,10.8,4.1,8.4,16.5,7.0,5.7,1.0,12.1,22.9
+10,Zona Centro,14.2,9.4,48.8,25.6,6.9,10.2,3.9,8.9,15.7,7.4,6.0,1.2,12.8,22.3
+11,Zona Sur,11.5,8.2,43.9,22.0,5.3,8.8,2.9,7.2,14.2,5.8,4.5,0.6,10.5,19.2
+12,Zona Sur,11.8,8.4,44.2,22.3,5.5,9.1,3.0,7.4,14.6,5.9,4.7,0.7,10.8,19.5
+13,Zona Sur,11.3,8.0,43.5,21.8,5.1,8.5,2.7,7.0,14.0,5.5,4.3,0.5,10.2,18.9
+14,Zona Sur,11.6,8.3,44.0,22.5,5.4,8.9,3.1,7.3,14.4,5.7,4.6,0.6,10.6,19.3
+15,Zona Sur,11.4,8.1,43.7,21.9,5.2,8.6,2.8,7.1,14.1,5.6,4.4,0.6,10.4,19.0`;
+            parseCSV(csv).then(rows => {
+                if (processData(rows)) {
+                    fileNameDisplay.textContent = '📋 Datos de ejemplo (15 filas)';
+                    showMessage('Ejemplo cargado con éxito', true);
+                }
+            }).catch(err => showError('Error al cargar ejemplo'));
+        }
+
+        // Guardar imagen
+        async function saveImage() {
+            const panel = document.getElementById('statsPanel');
+            try {
+                const canvas = await html2canvas(panel, { scale: 2.2, backgroundColor: '#ffffff' });
+                const link = document.createElement('a');
+                link.download = `informe_canasta_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showMessage('Informe guardado como imagen', true);
+            } catch(e) { 
+                console.error(e);
+                showError('No se pudo guardar la imagen'); 
+            }
+        }
+
+        // Modal handlers
+        function openModal() {
+            if (rawDataRows.length === 0) {
+                showError('No hay datos cargados para mostrar');
+                return;
+            }
+            renderRawDataModal();
+            modalOverlay.classList.add('active');
+        }
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+        }
+        
+        // Eventos
+        csvFileInput.addEventListener('change', e => { if(e.target.files[0]) loadCSV(e.target.files[0]); });
+        loadExampleBtn.addEventListener('click', loadExample);
+        saveReportBtn.addEventListener('click', saveImage);
+        backToCombinedBtn.addEventListener('click', resetToCombined);
+        viewRawDataBtn.addEventListener('click', openModal);
+        closeModalBtn.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+
+        // Inicial
+        window.addEventListener('DOMContentLoaded', () => {
+            Plotly.newPlot(chartContainer, [{ y:[], type:'box' }], { title:'Cargue un archivo CSV o use el ejemplo' });
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Cargue datos para comenzar</td></tr>';
+            updateRawDataButtonState();
+        });
+    })();
+</script>
+</body>
+</html>
